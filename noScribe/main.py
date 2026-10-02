@@ -68,7 +68,12 @@ if platform.system() == "Darwin": # = MAC
         os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 if platform.system() == 'Windows':
-    import cpufeature
+    try:
+        import cpufeature
+    except ImportError:
+        # The optional extension requires a C++ toolchain on newer Python
+        # versions. Transcription itself works without CPU feature reporting.
+        cpufeature = None
 
 # In the compiled version (no command line), stdout is None which might lead to errors
 if sys.stdout is None:
@@ -301,7 +306,7 @@ def _show_startup_error(message: str) -> None:
 
 # determine optimal number of threads for faster-whisper (depending on cpu cores)
 if platform.system() == 'Windows':
-    number_threads = get_config('threads', cpufeature.CPUFeature["num_physical_cores"])
+    number_threads = get_config('threads', cpufeature.CPUFeature["num_physical_cores"] if cpufeature else min(os.cpu_count() or 4, 4))
 elif platform.system() == "Linux":
     number_threads = get_config('threads', os.cpu_count() if os.cpu_count() is not None else 4)
 elif platform.system() == "Darwin": # = MAC
@@ -2653,7 +2658,7 @@ class App(ctk.CTk):
             self.logn("=== CPU FEATURES ===", where="file")
             if platform.system() == 'Windows':
                 self.logn("System: Windows", where="file")
-                for key, value in cpufeature.CPUFeature.items():
+                for key, value in (cpufeature.CPUFeature.items() if cpufeature else {'cpu_features': 'Optional cpufeature extension unavailable; using conservative thread count'}.items()):
                     self.logn('    {:24}: {}'.format(key, value), where="file")
             elif platform.system() == "Darwin": # = MAC
                 self.logn(f"System: MAC {platform.machine()}", where="file")
